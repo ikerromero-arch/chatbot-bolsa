@@ -4,38 +4,52 @@ import streamlit as st
 from ta.momentum import RSIIndicator
 from ta.trend import SMAIndicator, MACD
 
+import yfinance as yf
+import pandas as pd
+from ta.momentum import RSIIndicator
+from ta.trend import SMAIndicator, MACD
+import streamlit as st
+
 def descargar_datos(ticker):
-    import yfinance as yf
+    # Descargar datos
     df = yf.download(ticker, start="2020-01-01", progress=False)
     
-    # Revisar si se descargó algo
     if df.empty:
-        raise ValueError(f"No se encontraron datos para el ticker '{ticker}'. Revisa que esté escrito correctamente.")
-    
-    # Corregir nombre de columna 'Adj Close' si es necesario
+        st.error(f"No se encontraron datos para el ticker '{ticker}'. Revisa que esté escrito correctamente.")
+        return None
+
+    # Renombrar 'Adj. Close' si existe
     if 'Adj. Close' in df.columns:
         df.rename(columns={'Adj. Close':'Adj Close'}, inplace=True)
     
-    columnas_necesarias = ['Open','High','Low','Close','Adj Close','Volume']
-    for col in columnas_necesarias:
-        if col not in df.columns:
-            raise KeyError(f"La columna '{col}' no existe en los datos descargados.")
+    # Comprobar columnas mínimas
+    min_cols = ['Adj Close', 'Open', 'High', 'Low', 'Close', 'Volume']
+    missing = [c for c in min_cols if c not in df.columns]
+    if missing:
+        st.warning(f"Algunas columnas faltan en los datos descargados: {missing}. Se usarán las disponibles.")
     
-    df = df[columnas_necesarias].dropna()
     return df
-
 
 def agregar_indicadores(df):
+    if df is None:
+        return None
+    
     df = df.copy()
-    df['sma_10'] = SMAIndicator(df['Adj Close'], window=10).sma_indicator()
-    df['sma_50'] = SMAIndicator(df['Adj Close'], window=50).sma_indicator()
-    df['rsi_14'] = RSIIndicator(df['Adj Close'], window=14).rsi()
-    df['momentum_10'] = df['Adj Close'] - df['Adj Close'].shift(10)
-    macd = MACD(df['Adj Close'])
-    df['macd'] = macd.macd()
-    df['macd_signal'] = macd.macd_signal()
-    df = df.dropna()
+    # Solo agregar indicadores si existen las columnas necesarias
+    if 'Adj Close' in df.columns:
+        df['sma_10'] = SMAIndicator(df['Adj Close'], window=10).sma_indicator()
+        df['sma_50'] = SMAIndicator(df['Adj Close'], window=50).sma_indicator()
+        df['rsi_14'] = RSIIndicator(df['Adj Close'], window=14).rsi()
+        df['momentum_10'] = df['Adj Close'] - df['Adj Close'].shift(10)
+        macd = MACD(df['Adj Close'])
+        df['macd'] = macd.macd()
+        df['macd_signal'] = macd.macd_signal()
+    else:
+        st.warning("No se puede calcular indicadores porque 'Adj Close' no está disponible.")
+    
+    df.dropna(inplace=True)
     return df
+
 
 def analizar_tendencia(df):
     ultima = df.iloc[-1]
