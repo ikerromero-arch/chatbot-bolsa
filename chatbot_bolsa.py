@@ -5,9 +5,25 @@ from ta.momentum import RSIIndicator
 from ta.trend import SMAIndicator, MACD
 
 def descargar_datos(ticker):
+    import yfinance as yf
     df = yf.download(ticker, start="2020-01-01", progress=False)
-    df = df[['Open','High','Low','Close','Adj Close','Volume']].dropna()
+    
+    # Revisar si se descargó algo
+    if df.empty:
+        raise ValueError(f"No se encontraron datos para el ticker '{ticker}'. Revisa que esté escrito correctamente.")
+    
+    # Corregir nombre de columna 'Adj Close' si es necesario
+    if 'Adj. Close' in df.columns:
+        df.rename(columns={'Adj. Close':'Adj Close'}, inplace=True)
+    
+    columnas_necesarias = ['Open','High','Low','Close','Adj Close','Volume']
+    for col in columnas_necesarias:
+        if col not in df.columns:
+            raise KeyError(f"La columna '{col}' no existe en los datos descargados.")
+    
+    df = df[columnas_necesarias].dropna()
     return df
+
 
 def agregar_indicadores(df):
     df = df.copy()
